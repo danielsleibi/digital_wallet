@@ -1,7 +1,9 @@
 from django.db import models
 from django.conf import settings
+from decimal import Decimal
 from django.core.validators import MinValueValidator
 from apps.wallets.models import Wallet
+import uuid
 
 class Transaction(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -37,7 +39,7 @@ class LedgerPosting(models.Model):
         DEBIT = "debit"
         CREDIT = "credit"
 
-    id = models.UUIDField(primary_key=True, editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     transaction = models.ForeignKey(
         Transaction,
         on_delete=models.PROTECT,
@@ -66,7 +68,7 @@ class LedgerPosting(models.Model):
         ]
         constraints = [
             models.CheckConstraint(
-                check=~models.Q(amount=Decimal("0")),
+                condition=~models.Q(amount=Decimal("0")),
                 name="posting_amount_non_zero"
             ),
         ]
