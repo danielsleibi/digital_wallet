@@ -1,10 +1,10 @@
 # apps/ledger/services/transaction_service.py
 
 from django.db import transaction
-from django.db.models import Sum
 from decimal import Decimal
-from apps.wallets.models import Wallet
-from apps.ledger.models import Transaction, LedgerPosting
+from apps.wallets.repository import WalletRepository
+from apps.ledger.repository import LedgerRepository
+from apps.ledger.models import LedgerPosting
 from apps.common.exceptions import LedgerError
 
 @transaction.atomic
@@ -14,11 +14,7 @@ def create_transaction(*, user, description, postings):
 
     wallet_ids = {p["wallet_id"] for p in postings}
 
-    wallets = (
-        Wallet.objects
-        .select_for_update()
-        .filter(id__in=wallet_ids, user=user, status=Wallet.Status.ACTIVE)
-    )
+    wallets = WalletRepository.get_wallets_for_update(wallet_ids, user)
 
     if wallets.count() != len(wallet_ids):
         raise LedgerError("Invalid or inactive wallet")
@@ -53,31 +49,29 @@ def create_transaction(*, user, description, postings):
     for p in postings:
         if p["direction"] == LedgerPosting.Direction.DEBIT:
             wallet = wallet_map[p["wallet_id"]]
-
-            balance = (
-                LedgerPosting.objects
-                .filter(wallet=wallet)
-                .aggregate(total=Sum("amount"))["total"]
-                or Decimal("0")
-            )
+            balance = LedgerRepository.get_wallet_balance(wallet)
 
             if balance < p["amount"]:
                 raise LedgerError("Insufficient funds")
 
-    txn = Transaction.objects.create(
+    txn = LedgerRepository.create_transaction(
         user=user,
         description=description,
     )
 
+    posting_records = []
     for p in postings:
         sign = Decimal("1") if p["direction"] == LedgerPosting.Direction.CREDIT else Decimal("-1")
-
-        LedgerPosting.objects.create(
-            transaction=txn,
-            wallet=wallet_map[p["wallet_id"]],
-            amount=sign * p["amount"],
-            direction=p["direction"],
-            currency=currency,
+        posting_records.append(
+            LedgerPosting(
+                transaction=txn,
+                wallet=wallet_map[p["wallet_id"]],
+                amount=sign * p["amount"],
+                direction=p["direction"],
+                currency=currency,
+            )
         )
+
+    LedgerRepository.create_postings(posting_records)
 
     return txn
