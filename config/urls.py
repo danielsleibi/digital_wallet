@@ -16,7 +16,14 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from ninja import NinjaAPI
+from apps.users.api.router import router as users_router
+
+api = NinjaAPI(title="Digital Wallet API", version="1.0.0")
+
+api.add_router("/auth", users_router)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path("api/", api.urls),
 ]
