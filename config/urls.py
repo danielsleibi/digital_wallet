@@ -18,10 +18,12 @@ from django.contrib import admin
 from django.urls import path
 from ninja import NinjaAPI
 from apps.users.api.router import router as users_router
+from apps.ledger.api.router import router as ledger_router
 
 api = NinjaAPI(title="Digital Wallet API", version="1.0.0")
 
 api.add_router("/auth", users_router)
+api.add_router("/transactions", ledger_router)
 
 urlpatterns = [
     path('admin/', admin.site.urls),

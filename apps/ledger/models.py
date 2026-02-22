@@ -6,7 +6,17 @@ from apps.wallets.models import Wallet
 import uuid
 
 class Transaction(models.Model):
+    class TransactionType(models.TextChoices):
+        NORMAL = "normal"
+        REVERSAL = "reversal"
+        REFUND = "refund"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    type = models.CharField(
+        max_length=10,
+        choices=TransactionType.choices,
+        default=TransactionType.NORMAL
+    )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -15,13 +25,13 @@ class Transaction(models.Model):
     description = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    # Optional: for reversals
-    reversed_transaction = models.OneToOneField(
+    # For tracking reversals and refunds
+    reversal_of = models.ForeignKey(
         "self",
         null=True,
         blank=True,
         on_delete=models.PROTECT,
-        related_name="reversal"
+        related_name="reversals"
     )
 
     class Meta:
