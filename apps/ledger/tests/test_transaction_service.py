@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from apps.wallets.models import Wallet
 from apps.ledger.models import Transaction, LedgerPosting
 from apps.ledger.services.transaction_service import create_transaction
-from apps.common.exceptions import LedgerError
+from apps.common.exceptions import LedgerError, InsufficientFundsError, CurrencyMismatchError
 
 User = get_user_model()
 
@@ -135,7 +135,7 @@ class TransactionServiceTests(TransactionTestCase):
             )
 
     def test_overspend_fails(self):
-        with self.assertRaisesMessage(LedgerError, "Insufficient funds"):
+        with self.assertRaises(InsufficientFundsError):
             create_transaction(
                 user=self.user,
                 description="Overspend",
@@ -161,7 +161,7 @@ class TransactionServiceTests(TransactionTestCase):
             status=Wallet.Status.ACTIVE
         )
         
-        with self.assertRaisesMessage(LedgerError, "Cross-currency transaction not allowed"):
+        with self.assertRaises(CurrencyMismatchError):
             create_transaction(
                 user=self.user,
                 description="Cross Currency",
@@ -205,7 +205,7 @@ class TransactionServiceTests(TransactionTestCase):
                     ]
                 )
                 return True
-            except LedgerError:
+            except InsufficientFundsError:
                 return False
 
         with ThreadPoolExecutor(max_workers=2) as executor:

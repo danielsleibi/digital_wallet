@@ -5,7 +5,7 @@ from decimal import Decimal
 from apps.wallets.repository import WalletRepository
 from apps.ledger.repository import LedgerRepository
 from apps.ledger.models import LedgerPosting
-from apps.common.exceptions import LedgerError
+from apps.common.exceptions import LedgerError, InsufficientFundsError, CurrencyMismatchError
 
 @transaction.atomic
 def create_transaction(*, user, description, postings):
@@ -31,7 +31,7 @@ def create_transaction(*, user, description, postings):
         if currency is None:
             currency = wallet.currency
         elif wallet.currency != currency:
-            raise LedgerError("Cross-currency transaction not allowed")
+            raise CurrencyMismatchError("Cross-currency transaction not allowed")
 
         amount = p["amount"]
         if amount <= 0:
@@ -52,7 +52,7 @@ def create_transaction(*, user, description, postings):
             balance = LedgerRepository.get_wallet_balance(wallet)
 
             if balance < p["amount"]:
-                raise LedgerError("Insufficient funds")
+                raise InsufficientFundsError("Insufficient funds")
 
     txn = LedgerRepository.create_transaction(
         user=user,

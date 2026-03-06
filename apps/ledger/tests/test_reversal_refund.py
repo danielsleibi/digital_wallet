@@ -5,7 +5,7 @@ from apps.wallets.models import Wallet
 from apps.ledger.models import Transaction, LedgerPosting
 from apps.ledger.services.transaction_service import create_transaction
 from apps.ledger.services.compensation_service import reverse_transaction, refund_transaction
-from apps.common.exceptions import LedgerError
+from apps.common.exceptions import TransactionReversalError, TransactionRefundError
 from concurrent.futures import ThreadPoolExecutor
 
 User = get_user_model()
@@ -50,8 +50,8 @@ class TransactionReversalRefundTests(TransactionTestCase):
         )
 
     def _get_balance(self, wallet):
-        from django.db.models import Sum
-        return LedgerPosting.objects.filter(wallet=wallet).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+        from apps.ledger.repository import LedgerRepository
+        return LedgerRepository.get_wallet_balance(wallet)
 
     def test_reversal_success(self):
         rev_txn = reverse_transaction(user=self.user, transaction_id=self.original_txn.id)
@@ -66,12 +66,12 @@ class TransactionReversalRefundTests(TransactionTestCase):
 
     def test_prevent_reversal_of_reversal(self):
         rev_txn = reverse_transaction(user=self.user, transaction_id=self.original_txn.id)
-        with self.assertRaisesMessage(LedgerError, "Only NORMAL transactions can be reversed"):
+        with self.assertRaises(TransactionReversalError):
             reverse_transaction(user=self.user, transaction_id=rev_txn.id)
 
     def test_prevent_duplicate_reversal(self):
         reverse_transaction(user=self.user, transaction_id=self.original_txn.id)
-        with self.assertRaisesMessage(LedgerError, "Transaction has already been fully reversed"):
+        with self.assertRaises(TransactionReversalError):
             reverse_transaction(user=self.user, transaction_id=self.original_txn.id)
 
     def test_refund_success(self):
@@ -95,7 +95,7 @@ class TransactionReversalRefundTests(TransactionTestCase):
 
     def test_prevent_over_refunding(self):
         refund_transaction(user=self.user, transaction_id=self.original_txn.id, refund_amount=Decimal("80.00"))
-        with self.assertRaisesMessage(LedgerError, "Refund amount exceeds remaining refundable amount"):
+        with self.assertRaises(TransactionRefundError):
             refund_transaction(user=self.user, transaction_id=self.original_txn.id, refund_amount=Decimal("30.00"))
 
     def test_concurrency_simultaneous_refunds(self):
@@ -106,7 +106,7 @@ class TransactionReversalRefundTests(TransactionTestCase):
                 connection.close()
                 refund_transaction(user=self.user, transaction_id=self.original_txn.id, refund_amount=Decimal("80.00"))
                 return True
-            except LedgerError:
+            except TransactionRefundError:
                 return False
 
         with ThreadPoolExecutor(max_workers=2) as executor:
