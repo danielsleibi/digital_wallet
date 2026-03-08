@@ -16,3 +16,26 @@ class WalletRepository:
             .select_for_update()
             .filter(id__in=wallet_ids, user=user, status=Wallet.Status.ACTIVE)
         )
+
+    @staticmethod
+    def wallet_exists(user, name: str, currency: str) -> bool:
+        """
+        Return True if any wallet (regardless of status) with the given
+        name and currency already belongs to this user.
+
+        We check across all statuses so that an archived wallet name
+        cannot be silently reused with the same currency.
+        """
+        return Wallet.objects.filter(user=user, name=name, currency=currency).exists()
+
+    @staticmethod
+    def create_wallet(user, name: str, currency: str) -> Wallet:
+        """
+        Persist and return a new active wallet for the given user.
+        """
+        return Wallet.objects.create(
+            user=user,
+            name=name,
+            currency=currency,
+            status=Wallet.Status.ACTIVE,
+        )
