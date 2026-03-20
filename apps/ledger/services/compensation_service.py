@@ -41,12 +41,13 @@ def reverse_transaction(*, user, transaction_id):
         )
         
         new_amount = -p.amount
-        
+
         if new_direction == LedgerPosting.Direction.DEBIT:
             wallet = wallet_map[p.wallet_id]
-            balance = LedgerRepository.get_wallet_balance(wallet)
-            if balance < abs(new_amount):
-                raise InsufficientFundsError("Insufficient funds for reversal")
+            if not wallet.is_system:
+                balance = LedgerRepository.get_wallet_balance(wallet)
+                if balance < abs(new_amount):
+                    raise InsufficientFundsError("Insufficient funds for reversal")
 
         posting_records.append(
             LedgerPosting(
@@ -131,9 +132,10 @@ def refund_transaction(*, user, transaction_id, refund_amount):
     for p in posting_records:
         if p.direction == LedgerPosting.Direction.DEBIT:
             wallet = wallet_map[p.wallet_id]
-            balance = LedgerRepository.get_wallet_balance(wallet)
-            if balance < abs(p.amount):
-                raise InsufficientFundsError("Insufficient funds for refund")
+            if not wallet.is_system:
+                balance = LedgerRepository.get_wallet_balance(wallet)
+                if balance < abs(p.amount):
+                    raise InsufficientFundsError("Insufficient funds for refund")
 
     LedgerRepository.create_postings(posting_records)
     return refund_txn

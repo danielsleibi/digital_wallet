@@ -49,6 +49,9 @@ def create_transaction(*, user, description, postings):
     for p in postings:
         if p["direction"] == LedgerPosting.Direction.DEBIT:
             wallet = wallet_map[p["wallet_id"]]
+            if wallet.is_system:
+                continue
+
             balance = LedgerRepository.get_wallet_balance(wallet)
 
             if balance < p["amount"]:

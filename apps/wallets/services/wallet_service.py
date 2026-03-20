@@ -2,13 +2,16 @@
 
 import re
 from uuid import UUID
+from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 
 from apps.wallets.models import Wallet
 from apps.wallets.repository import WalletRepository
 from apps.ledger.repository import LedgerRepository
-from apps.common.exceptions import LedgerError
+from apps.ledger.services.transaction_service import create_transaction
+from apps.ledger.models import LedgerPosting
+from apps.common.exceptions import LedgerError, InsufficientFundsError, CurrencyMismatchError
 
 # ISO-4217 codes are exactly 3 uppercase ASCII letters
 _CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
@@ -30,7 +33,7 @@ def get_wallet_balance(user, wallet_id: UUID):
     does not belong to the requesting user.
     """
     try:
-        wallet = Wallet.objects.get(id=wallet_id, user=user, status=Wallet.Status.ACTIVE)
+        wallet = WalletRepository.get_user_wallet(wallet_id, user)
     except Wallet.DoesNotExist:
         raise LedgerError("Wallet not found or access denied")
 
@@ -71,4 +74,76 @@ def create_wallet(user, name: str, currency: str) -> Wallet:
         )
 
     return WalletRepository.create_wallet(user=user, name=name, currency=currency)
+
+
+def fund_wallet(user, wallet_id: UUID, amount: Decimal, system_wallet_name: str, description: str = "Wallet funding"):
+    """
+    Add funds to a user's wallet by debiting a system wallet.
+
+    Args:
+        user: The authenticated user (DomainUser or Django User)
+        wallet_id: UUID of the target wallet to fund
+        amount: Amount to credit to the target wallet (must be positive)
+        system_wallet_name: Name of the system wallet to debit (e.g., "EQUITY" or "INCOME")
+        description: Transaction description
+
+    Returns:
+        tuple: (Transaction, new_balance)
+
+    Raises:
+        ValueError: If amount is not positive or other validation fails
+        LedgerError: If wallet not found, system wallet not found, or other ledger errors
+    """
+    # Resolve user to Django model instance if needed
+    if isinstance(user, str):
+        user = User.objects.get(id=user)
+    elif not hasattr(user, "pk"):
+        user = User.objects.get(id=user.id)
+
+    # Validate amount
+    if amount <= 0:
+        raise ValueError("Amount must be positive")
+
+    # Fetch target wallet (must belong to user and be active)
+    try:
+        target_wallet = WalletRepository.get_user_wallet(wallet_id, user)
+    except Wallet.DoesNotExist:
+        raise LedgerError("Wallet not found or access denied")
+
+    # Prevent funding system wallets
+    if target_wallet.is_system:
+        raise ValueError("Cannot fund a system wallet")
+
+    # Find the specified system wallet with matching currency
+    system_wallet = WalletRepository.get_system_wallet(
+        currency=target_wallet.currency,
+        name=system_wallet_name
+    )
+    if not system_wallet:
+        raise LedgerError(
+            f"System wallet '{system_wallet_name}' not found or inactive for currency {target_wallet.currency}"
+        )
+
+    # Create the transaction
+    txn = create_transaction(
+        user=user,
+        description=description or f"Funding for wallet {target_wallet.name}",
+        postings=[
+            {
+                "wallet_id": system_wallet.id,
+                "amount": amount,
+                "direction": LedgerPosting.Direction.DEBIT,
+            },
+            {
+                "wallet_id": target_wallet.id,
+                "amount": amount,
+                "direction": LedgerPosting.Direction.CREDIT,
+            }
+        ]
+    )
+
+    # Get new balance
+    new_balance = LedgerRepository.get_wallet_balance(target_wallet)
+
+    return txn, new_balance
 

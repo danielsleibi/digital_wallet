@@ -22,6 +22,10 @@ class Wallet(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
+    @property
+    def is_system(self):
+        return self.user.is_system
+
     class Meta:
         unique_together = ("user", "name", "currency")
         indexes = [
