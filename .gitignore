@@ -1,1 +1,3 @@
 ﻿__pycache__/
+.claude
+db.sqlite3
