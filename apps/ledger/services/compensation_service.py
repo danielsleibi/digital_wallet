@@ -11,15 +11,15 @@ from apps.users.repository import UserRepository
 @transaction.atomic
 def reverse_transaction(*, user, transaction_id):
     original_txn = LedgerRepository.get_transaction_for_update(transaction_id)
-    
+
     if original_txn.type != Transaction.TransactionType.NORMAL:
         raise TransactionReversalError("Only NORMAL transactions can be reversed")
-        
+
     if Transaction.objects.filter(reversal_of=original_txn, type=Transaction.TransactionType.REVERSAL).exists():
         raise TransactionReversalError("Transaction has already been fully reversed")
 
     postings = LedgerRepository.get_postings_for_transaction(original_txn)
-    
+
     wallet_ids = {p.wallet_id for p in postings}
     wallets = WalletRepository.get_wallets_for_update(wallet_ids, user.id)
     if wallets.count() != len(wallet_ids):
@@ -70,19 +70,19 @@ def refund_transaction(*, user, transaction_id, refund_amount):
         raise TransactionRefundError("Refund amount must be positive")
 
     original_txn = LedgerRepository.get_transaction_for_update(transaction_id)
-    
+
     if original_txn.type != Transaction.TransactionType.NORMAL:
         raise TransactionRefundError("Only NORMAL transactions can be refunded")
-        
+
     postings = LedgerRepository.get_postings_for_transaction(original_txn)
-    
+
     original_volume = sum(p.amount for p in postings if p.amount > 0)
-    
+
     already_refunded = LedgerRepository.get_total_refunded_amount(original_txn)
-    
+
     if refund_amount > (original_volume - already_refunded):
         raise TransactionRefundError("Refund amount exceeds remaining refundable amount")
-        
+
     wallet_ids = {p.wallet_id for p in postings}
     wallets = WalletRepository.get_wallets_for_update(wallet_ids, user.id)
     if wallets.count() != len(wallet_ids):

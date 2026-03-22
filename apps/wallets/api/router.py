@@ -44,7 +44,7 @@ def create_wallet_endpoint(request: HttpRequest, payload: WalletCreateIn):
 def wallet_balance(request: HttpRequest, wallet_id: UUID):
     """Return the current ledger balance for a single wallet owned by the authenticated user."""
     try:
-        balance = get_wallet_balance(user=request.auth.id, wallet_id=wallet_id)
+        balance = get_wallet_balance(user=request.auth, wallet_id=wallet_id)
         return 200, {"wallet_id": wallet_id, "balance": balance}
     except LedgerError as e:
         return 404, {"detail": str(e)}

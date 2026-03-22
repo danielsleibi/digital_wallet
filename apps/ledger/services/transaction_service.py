@@ -13,6 +13,7 @@ def create_transaction(*, user, description, postings):
     if len(postings) < 2:
         raise LedgerError("Transaction must have at least two postings")
 
+
     wallet_ids = {p["wallet_id"] for p in postings}
 
     wallets = WalletRepository.get_wallets_for_update(wallet_ids, user.id)

@@ -4,8 +4,6 @@ import re
 from uuid import UUID
 from decimal import Decimal
 
-from django.contrib.auth import get_user_model
-
 from apps.wallets.models import Wallet
 from apps.wallets.repository import WalletRepository
 from apps.ledger.repository import LedgerRepository
@@ -16,14 +14,12 @@ from apps.common.exceptions import LedgerError, InsufficientFundsError, Currency
 # ISO-4217 codes are exactly 3 uppercase ASCII letters
 _CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
 
-User = get_user_model()
-
 
 def get_user_wallets(user):
     """
     Return all active wallets belonging to the authenticated user.
     """
-    return Wallet.objects.filter(user=user, status=Wallet.Status.ACTIVE).order_by("created_at")
+    return WalletRepository.get_user_wallets(user.id)
 
 
 def get_wallet_balance(user, wallet_id: UUID):
@@ -32,8 +28,9 @@ def get_wallet_balance(user, wallet_id: UUID):
     Raises LedgerError if the wallet does not exist, is inactive, or
     does not belong to the requesting user.
     """
+
     try:
-        wallet = WalletRepository.get_user_wallet(wallet_id, user)
+        wallet = WalletRepository.get_user_wallet(wallet_id, user.id)
     except Wallet.DoesNotExist:
         raise LedgerError("Wallet not found or access denied")
 
@@ -60,15 +57,8 @@ def create_wallet(user, name: str, currency: str) -> Wallet:
             f"Invalid currency code '{currency}'. Must be exactly 3 uppercase letters (ISO-4217)."
         )
 
-    # Resolve to a Django model instance when we receive a DomainUser dataclass
-    if isinstance(user, str):
-        user = User.objects.get(id=user)
-    elif not hasattr(user, "pk"):
-        # DomainUser dataclass – fetch the real Django model instance by id
-        user = User.objects.get(id=user.id)
-
     # Guard against duplicate (user, name, currency)
-    if WalletRepository.wallet_exists(user=user, name=name, currency=currency):
+    if WalletRepository.wallet_exists(user_id=user.id, name=name, currency=currency):
         raise ValueError(
             f"A wallet named '{name}' with currency {currency} already exists for this account."
         )
@@ -94,19 +84,13 @@ def fund_wallet(user, wallet_id: UUID, amount: Decimal, system_wallet_name: str,
         ValueError: If amount is not positive or other validation fails
         LedgerError: If wallet not found, system wallet not found, or other ledger errors
     """
-    # Resolve user to Django model instance if needed
-    if isinstance(user, str):
-        user = User.objects.get(id=user)
-    elif not hasattr(user, "pk"):
-        user = User.objects.get(id=user.id)
-
     # Validate amount
     if amount <= 0:
         raise ValueError("Amount must be positive")
 
     # Fetch target wallet (must belong to user and be active)
     try:
-        target_wallet = WalletRepository.get_user_wallet(wallet_id, user)
+        target_wallet = WalletRepository.get_user_wallet(wallet_id, user.id)
     except Wallet.DoesNotExist:
         raise LedgerError("Wallet not found or access denied")
 
