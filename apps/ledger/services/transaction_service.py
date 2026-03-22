@@ -6,6 +6,7 @@ from apps.wallets.repository import WalletRepository
 from apps.ledger.repository import LedgerRepository
 from apps.ledger.models import LedgerPosting
 from apps.common.exceptions import LedgerError, InsufficientFundsError, CurrencyMismatchError
+from apps.users.repository import UserRepository
 
 @transaction.atomic
 def create_transaction(*, user, description, postings):
@@ -14,7 +15,7 @@ def create_transaction(*, user, description, postings):
 
     wallet_ids = {p["wallet_id"] for p in postings}
 
-    wallets = WalletRepository.get_wallets_for_update(wallet_ids, user)
+    wallets = WalletRepository.get_wallets_for_update(wallet_ids, user.id)
 
     if wallets.count() != len(wallet_ids):
         raise LedgerError("Invalid or inactive wallet")
@@ -58,7 +59,7 @@ def create_transaction(*, user, description, postings):
                 raise InsufficientFundsError("Insufficient funds")
 
     txn = LedgerRepository.create_transaction(
-        user=user,
+        user=UserRepository.get_by_id(user.id),
         description=description,
     )
 

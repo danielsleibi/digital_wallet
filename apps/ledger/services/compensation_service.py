@@ -6,6 +6,7 @@ from apps.wallets.repository import WalletRepository
 from apps.ledger.repository import LedgerRepository
 from apps.ledger.models import LedgerPosting, Transaction
 from apps.common.exceptions import LedgerError, TransactionReversalError, TransactionRefundError, InsufficientFundsError
+from apps.users.repository import UserRepository
 
 @transaction.atomic
 def reverse_transaction(*, user, transaction_id):
@@ -20,13 +21,13 @@ def reverse_transaction(*, user, transaction_id):
     postings = LedgerRepository.get_postings_for_transaction(original_txn)
     
     wallet_ids = {p.wallet_id for p in postings}
-    wallets = WalletRepository.get_wallets_for_update(wallet_ids, user)
+    wallets = WalletRepository.get_wallets_for_update(wallet_ids, user.id)
     if wallets.count() != len(wallet_ids):
         raise LedgerError("Invalid or inactive wallet")
     wallet_map = {w.id: w for w in wallets}
 
     reversal_txn = LedgerRepository.create_transaction(
-        user=user,
+        user=UserRepository.get_by_id(user.id),
         description=f"Reversal of {original_txn.id}",
         type=Transaction.TransactionType.REVERSAL,
         reversal_of=original_txn
@@ -83,13 +84,13 @@ def refund_transaction(*, user, transaction_id, refund_amount):
         raise TransactionRefundError("Refund amount exceeds remaining refundable amount")
         
     wallet_ids = {p.wallet_id for p in postings}
-    wallets = WalletRepository.get_wallets_for_update(wallet_ids, user)
+    wallets = WalletRepository.get_wallets_for_update(wallet_ids, user.id)
     if wallets.count() != len(wallet_ids):
         raise LedgerError("Invalid or inactive wallet")
     wallet_map = {w.id: w for w in wallets}
         
     refund_txn = LedgerRepository.create_transaction(
-        user=user,
+        user=UserRepository.get_by_id(user.id),
         description=f"Refund of {original_txn.id}",
         type=Transaction.TransactionType.REFUND,
         reversal_of=original_txn
