@@ -10,6 +10,7 @@ from apps.ledger.repository import LedgerRepository
 from apps.ledger.services.transaction_service import create_transaction
 from apps.ledger.models import LedgerPosting
 from apps.common.exceptions import LedgerError, InsufficientFundsError, CurrencyMismatchError
+from apps.users.repository import UserRepository
 
 # ISO-4217 codes are exactly 3 uppercase ASCII letters
 _CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
@@ -63,7 +64,7 @@ def create_wallet(user, name: str, currency: str) -> Wallet:
             f"A wallet named '{name}' with currency {currency} already exists for this account."
         )
 
-    return WalletRepository.create_wallet(user=user, name=name, currency=currency)
+    return WalletRepository.create_wallet(user=UserRepository.get_by_id(user.id), name=name, currency=currency)
 
 
 def fund_wallet(user, wallet_id: UUID, amount: Decimal, system_wallet_name: str, description: str = "Wallet funding"):

@@ -22,7 +22,7 @@ router = Router(tags=["Wallets"])
 @router.get("/", response={200: List[WalletOut]}, auth=JWTAuth())
 def list_wallets(request: HttpRequest):
     """Return all active wallets belonging to the authenticated user."""
-    wallets = get_user_wallets(user=request.auth.id)
+    wallets = get_user_wallets(user=request.auth)
     return 200, list(wallets)
 
 
