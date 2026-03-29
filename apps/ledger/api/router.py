@@ -108,7 +108,7 @@ def list_transactions(
         return 400, {"detail": str(e)}
 
 
-@router.get("/{transaction_id}", response={200: TransactionOut, 404: ErrorOut}, auth=JWTAuth())
+@router.get("/{uuid:transaction_id}", response={200: TransactionOut, 404: ErrorOut}, auth=JWTAuth())
 def get_transaction(request: HttpRequest, transaction_id: UUID):
     """
     Retrieve detailed transaction information including all ledger postings.
@@ -151,13 +151,13 @@ class TransferRequest(BaseModel):
     description: str
 
 
-@router.post("/{transaction_id}/reverse", response={200: Dict[str, Any]}, auth=JWTAuth())
+@router.post("/{uuid:transaction_id}/reverse", response={200: Dict[str, Any]}, auth=JWTAuth())
 def reverse(request: HttpRequest, transaction_id: UUID):
     txn = reverse_transaction(user=request.auth, transaction_id=transaction_id)
     return 200, {"message": "Transaction reversed successfully", "transaction_id": str(txn.id)}
 
 
-@router.post("/{transaction_id}/refund", response={200: Dict[str, Any]}, auth=JWTAuth())
+@router.post("/{uuid:transaction_id}/refund", response={200: Dict[str, Any]}, auth=JWTAuth())
 def refund(request: HttpRequest, transaction_id: UUID, payload: RefundRequest):
     txn = refund_transaction(user=request.auth, transaction_id=transaction_id, refund_amount=payload.amount)
     return 200, {"message": "Transaction refunded successfully", "transaction_id": str(txn.id)}
