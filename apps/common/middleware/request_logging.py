@@ -113,7 +113,7 @@ class RequestLoggingMiddleware(MiddlewareMixin):
                     body = json.loads(request.body.decode('utf-8'))
                     log_data['body'] = self._sanitize_body(body)
                 except (json.JSONDecodeError, UnicodeDecodeError):
-                    log_data['body'] = '<non-json data>'
+                    log_data['body'] = request.body.decode('utf-8', errors='replace')
 
             logger.info(f"Request: {request.method} {request.get_full_path()}", extra=log_data)
         except Exception as e:
@@ -144,7 +144,7 @@ class RequestLoggingMiddleware(MiddlewareMixin):
                         body = json.loads(response.content.decode('utf-8'))
                         log_data['body'] = self._sanitize_body(body)
                     except (json.JSONDecodeError, UnicodeDecodeError, AttributeError):
-                        log_data['body'] = '<non-json response>'
+                        log_data['body'] = response.content.decode('utf-8', errors='replace') if hasattr(response, 'content') else str(response)
 
             # Log at appropriate level based on status code
             if response.status_code >= 400:
