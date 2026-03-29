@@ -20,3 +20,6 @@ class User:
             last_name=model_instance.last_name,
             date_joined=model_instance.date_joined,
         )
+
+    def __str__(self) -> str:
+        return self.username
